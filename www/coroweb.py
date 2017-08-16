@@ -7,6 +7,7 @@ from urllib import parse
 
 from aiohttp import web
 
+from www.apis import APIError
 
 def get(path):
     # Define decorator @get('/path')
@@ -16,7 +17,7 @@ def get(path):
         def wrapper(*args, **kw):
             return func(*args, **kw)
         wrapper.__method__ = 'GET'
-        wrapper.__path__ = path
+        wrapper.__route__ = path
         return wrapper
     return decorator
 
@@ -28,7 +29,7 @@ def post(path):
         def wrapper(*args, **kw):
             return func(*args, **kw)
         wrapper.__method__ = 'POST'
-        wrapper.__path__ = path
+        wrapper.__route__ = path
         return wrapper
     return decorator
 
@@ -60,7 +61,7 @@ def has_named_kw_args(fn):
 
 def has_var_kw_arg(fn):
     params = inspect.signature(fn).parameters
-    for name, param in params:
+    for name, param in params.items():
         if param.kind == inspect.Parameter.VAR_KEYWORD:
             return True
 
@@ -140,13 +141,13 @@ class RequestHandler(object):
         try:
             r = yield from self._func(**kw)
             return r
-        except:
-            raise
+        except APIError as e:
+            return dict(error=e.error, data=e.data, message=e.message)
 
 
 def add_static(app):
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
-    app.route.add_static('/static/', path)
+    app.router.add_static('/static/', path)
     logging.info('add static %s => %s' % ('/static/', path))
 
 
@@ -158,7 +159,7 @@ def add_route(app, fn):
     if not asyncio.iscoroutinefunction(fn) and not inspect.isgeneratorfunction(fn):
         fn = asyncio.coroutine(fn)
     logging.info('add route %s %s => %s(%s)' % (method, path, fn.__name__, ', '.join(inspect.signature(fn).parameters.keys())))
-    app.route.add_route(method, path, RequestHandler(app, fn))
+    app.router.add_route(method, path, RequestHandler(app, fn))
 
 
 def add_routes(app, module_name):
