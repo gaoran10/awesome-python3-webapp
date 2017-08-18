@@ -151,6 +151,7 @@ def add_static(app):
     logging.info('add static %s => %s' % ('/static/', path))
 
 
+
 def add_route(app, fn):
     method = getattr(fn, '__method__', None)
     path = getattr(fn, '__route__', None)
