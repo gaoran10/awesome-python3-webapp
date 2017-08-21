@@ -3,13 +3,15 @@ import logging, json
 from aiohttp import web
 
 from www.config import configs
-from www.models import User, Blog, next_id
+from www.models import User, Blog, next_id, Comment
 
 from www.coroweb import get, post
 
 import time, re, hashlib
 
-from www.apis import APIValueError, APIError, APIPermissionError, Page
+import markdown2
+
+from www.apis import APIValueError, APIError, APIPermissionError, Page, APIResourceNotFoundError
 
 COOKIE_NAME = 'awesession'
 _COOKIE_KEY = configs.session.secret
@@ -41,6 +43,11 @@ def user2cookie(user, max_age):
     s = '%s-%s-%s-%s' % (user.id, user.passwd, expires, _COOKIE_KEY)
     L = [user.id, expires, hashlib.sha1(s.encode('utf-8')).hexdigest()]
     return '-'.join(L)
+
+
+def text2html(text):
+    lines = map(lambda s: '<p>%s</p>' % s.replace('&', '&amp').replace('<', '&lt').replace('>', '&gt'), filter(lambda s: s.strip() != '', text.split('\n')))
+    return ''.join(lines)
 
 
 async def cookie2user(cookie_str):
@@ -82,6 +89,21 @@ def signin():
     return {
         '__template__': 'signin.html'
     }
+
+
+@get('/blog/{id}')
+async def get_blog(id):
+    blog = await Blog.find(id)
+    comments = await Comment.findAll('blog_id=?', [id], orderBy='created_at desc')
+    for c in comments:
+        c.html_content = text2html(c.content)
+    blog.html_content = markdown2.markdown(blog.content)
+    return {
+        '__template__': 'blog.html',
+        'blog': blog,
+        'comments': comments
+    }
+
 
 
 @get('/manage/blogs')
@@ -154,7 +176,7 @@ async def index(request):
     ]
     return {
         '__template__': 'blogs.html',
-        'blogs': blogs,
+        'blogs': blogs
     }
 
 
@@ -230,3 +252,25 @@ async def api_blogs(*, page='1'):
 async def api_get_blog(*, id):
     blog = await Blog.find(id)
     return blog
+
+
+@post('/api/blogs/{blog_id}/comments')
+async def api_create_comment(blog_id, request, *, content):
+    check_admin(request)
+    user = request.__user__
+    if user is None:
+        raise APIPermissionError()
+    if not content or not content.strip():
+        raise APIValueError('content')
+    blog = Blog.find(blog_id)
+    if blog is None:
+        raise APIResourceNotFoundError('Blog')
+    comment = Comment(blog_id=blog_id, user_id=request.__user__.id, user_name=request.__user__.name, user_image=request.__user__.image, content=content)
+    await comment.save()
+    return comment
+
+
+@get('/api/blogs/{blog_id}/comments')
+async def api_get_comments(*, blog_id):
+    comments = Comment.findAll('blog_id=?', [blog_id], orderBy='created_at desc')
+    return comments

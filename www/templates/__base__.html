@@ -26,9 +26,9 @@
             </div>
             <div class="uk-navbar-right">
                 <ul class="uk-navbar-nav">
-                    {% if user %}
+                    {% if __user__ %}
                         <li>
-                            <a href="#0"><i uk-icon="icon: user" class="margin-right-5"></i>{{ user.name }} </a>
+                            <a href="#0"><i uk-icon="icon: user" class="margin-right-5"></i>{{ __user__.name }} </a>
                             <div uk-dropdown="mode: click">
                                 <ul class="uk-nav uk-dropdown-nav">
                                     <li><a href="/signout"><i uk-icon="icon: sign-out" class="margin-right-5"></i> 登出</a></li>

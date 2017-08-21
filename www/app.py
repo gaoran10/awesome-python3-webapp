@@ -1,8 +1,6 @@
-import logging;
+import logging
 
 from www.handlers import COOKIE_NAME, cookie2user
-
-logging.basicConfig(level=logging.INFO)
 
 import asyncio, os, json, time
 from datetime import datetime
@@ -13,6 +11,8 @@ from aiohttp import web
 
 import www.orm as orm
 from www.coroweb import add_routes, add_static
+
+logging.basicConfig(level=logging.INFO)
 
 
 def index(request):
@@ -86,6 +86,7 @@ def response_factory(app, handler):
                 resp.content_type = 'application/json;charset=utf-8'
                 return resp
             else:
+                r['__user__'] = request.__user__
                 resp = web.Response(body=app['__templating__'].get_template(template).render(**r).encode('utf-8'))
                 resp.content_type = 'text/html;charset=utf-8'
                 return resp
@@ -111,6 +112,8 @@ async def auth_factory(app, handler):
             if user:
                 logging.info('set current user: %s' % user.email)
                 request.__user__ = user
+        if request.path.startswith('/manage/') and (request.__user__ is None):
+            return web.HTTPFound('/signin')
         return (await handler(request))
     return auth
 
